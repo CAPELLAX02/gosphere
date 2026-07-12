@@ -1,20 +1,51 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"gosphere/internal/config"
+	"gosphere/pkg/database"
 )
 
 func main() {
-	fmt.Println("Running Go Backend API...")
+	fmt.Println("🚀 Pulse Backend API sistemleri başlatılıyor...")
 
-	// Load the configuration
+	// 1. Konfigürasyonu Yükle
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Could not load the configuration: %v", err)
+		log.Fatalf("Konfigürasyon yüklenemedi: %v", err)
 	}
-	
-	log.Printf("Configuration loaded successfully. Working environment [%s] | Port: [%s]", cfg.AppEnv, cfg.AppPort)
-	log.Printf("Database Target: %s@%s:%s/%s", cfg.DBUser, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	log.Printf("Konfigürasyon yüklendi | Ortam: [%s] | Port: [%s]", cfg.AppEnv, cfg.AppPort)
+
+	// 2. Otomatik Veritabanı Migrasyonlarını Çalıştır
+	database.RunMigrations(cfg.GetDBConnString())
+
+	// 3. PostgreSQL Bağlantı Havuzunu Kur
+	ctx := context.Background()
+	pgPool, err := database.NewPostgresPool(ctx, cfg.GetDBConnString())
+	if err != nil {
+		log.Fatalf("PostgreSQL bağlantı hatası: %v", err)
+	}
+	defer pgPool.Close()
+
+	// 4. Redis Bağlantısını Kur
+	redisClient, err := database.NewRedisClient(ctx, cfg)
+	if err != nil {
+		log.Fatalf("Redis bağlantı hatası: %v", err)
+	}
+	defer redisClient.Close()
+
+	log.Println("Tüm altyapı sistemleri hazır! Sunucu istekleri beklemeye geçiyor...")
+
+	// 5. Graceful Shutdown (Temiz Kapanış Mekanizması)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Sistem kapatılıyor, veritabanı ve Redis havuzları temizleniyor...")
 }

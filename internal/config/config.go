@@ -1,8 +1,8 @@
 package config
 
 import (
+	"fmt"
 	"log"
-
 	"github.com/spf13/viper"
 )
 
@@ -40,10 +40,6 @@ func LoadConfig() (*Config, error) {
 
 // GetDBConnString PostgreSQL için connection string üretir
 func (c *Config) GetDBConnString() string {
-	return "host=" + c.DBHost +
-			" port=" + c.DBPort +
-			" user=" + c.DBUser +
-			" password=" + c.DBPassword +
-			" dbname=" + c.DBName +
-			" sslmode=" + c.DBSSLMode
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName, c.DBSSLMode)
 }
